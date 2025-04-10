@@ -3,10 +3,15 @@
 #include <iostream>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <thread>
+#include <vector>
+#include <mutex>
 
 #pragma comment(lib, "ws2_32.lib")
 
 using namespace std;
+
+mutex cout_mutex;
 
 bool isOpen(const string& ip, int port) {
 	SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -23,6 +28,13 @@ bool isOpen(const string& ip, int port) {
 	int result = connect(sock, (sockaddr*)&addr, sizeof(addr));
 	closesocket(sock);
 	return result == 0;
+}
+
+void scanPort(const string& ip, int port) {
+	if (isOpen(ip, port)) {
+		lock_guard<mutex> lock(cout_mutex);
+		cout << "Port " << port << " is Open." << endl;
+	}
 }
 
 int main() {
@@ -44,13 +56,22 @@ int main() {
 	cout << "Enter end port: ";
 	cin >> endPort;
 
+	vector<thread> threads;
+
 	for (int port = startPort; port <= endPort; ++port) {
-		if (isOpen(targetIP, port)) {
-			cout << "Port " << port << " is open." << endl;
+		threads.emplace_back(scanPort, targetIP, port);
+
+		// Limit threads to avoid overload
+		if (threads.size() >= 100) {
+			for (auto& t : threads) {
+				t.join();
+			}
+			threads.clear();
 		}
-		else {
-			cout << "Port " << port << " is closed." << endl;
-		}
+	}
+
+	for (auto& t : threads) {
+		t.join();
 	}
 
 	WSACleanup();
