@@ -30,12 +30,29 @@ bool isOpen(const string& ip, int port) {
 	return result == 0;
 }
 
+string getServiceName(int port) {
+	switch (port) {
+	case 21: return "FTP";
+	case 22: return "SSH";
+	case 23: return "Telnet";
+	case 25: return "SMTP";
+	case 53: return "DNS";
+	case 80: return "HTTP";
+	case 110: return "POP3";
+	case 143: return "IMAP";
+	case 443: return "HTTPS";
+	default: return "Unknown";
+	}
+}
+
 void scanPort(const string& ip, int port) {
 	if (isOpen(ip, port)) {
 		lock_guard<mutex> lock(cout_mutex);
-		cout << "Port " << port << " is Open." << endl;
+		cout << port << "\t" << getServiceName(port) << "\t\t" << "Open" << endl;
 	}
 }
+
+
 
 int main() {
 	WSADATA wsaData;
@@ -55,6 +72,8 @@ int main() {
 	cin >> startPort;
 	cout << "Enter end port: ";
 	cin >> endPort;
+
+	cout << "Port \t Service Name" << endl;
 
 	vector<thread> threads;
 
