@@ -6,12 +6,18 @@
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <fstream>
+#include <string>
 
 #pragma comment(lib, "ws2_32.lib")
 
 using namespace std;
 
 mutex cout_mutex;
+mutex file_mutex;
+ofstream logFile;
+
+bool loggingEnabled = false;
 
 bool isOpen(const string& ip, int port) {
 	SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -28,6 +34,13 @@ bool isOpen(const string& ip, int port) {
 	int result = connect(sock, (sockaddr*)&addr, sizeof(addr));
 	closesocket(sock);
 	return result == 0;
+}
+
+void logResult(const string& message) {
+	lock_guard<mutex> lock(file_mutex);
+	if (loggingEnabled && logFile.is_open()) {
+		logFile << message << endl;
+	}
 }
 
 string getServiceName(int port) {
@@ -48,7 +61,9 @@ string getServiceName(int port) {
 void scanPort(const string& ip, int port) {
 	if (isOpen(ip, port)) {
 		lock_guard<mutex> lock(cout_mutex);
+		string message = to_string(port) + "\t" + getServiceName(port) + "\t\tOpen";
 		cout << port << "\t" << getServiceName(port) << "\t\t" << "Open" << endl;
+		logResult(message);
 	}
 }
 
@@ -65,6 +80,7 @@ int main() {
 	string targetIP;
 	int startPort;
 	int endPort;
+	string logPath;
 
 	cout << "Enter target IP address: ";
 	cin >> targetIP;
@@ -72,6 +88,20 @@ int main() {
 	cin >> startPort;
 	cout << "Enter end port: ";
 	cin >> endPort;
+
+	cout << "Enter path to log file (or press Enter to skip logging): ";
+	cin.ignore(); // flush newline left by previous input
+	getline(cin, logPath);
+
+	if (!logPath.empty()) {
+		logFile.open(logPath);
+		if (!logFile) {
+			cerr << "Could not open log file! Logging disabled." << endl;
+		}
+		else {
+			loggingEnabled = true;
+		}
+	}
 
 	cout << "Port \t Service Name" << endl;
 
@@ -91,6 +121,10 @@ int main() {
 
 	for (auto& t : threads) {
 		t.join();
+	}
+
+	if (logFile.is_open()) {
+		logFile.close();
 	}
 
 	WSACleanup();
